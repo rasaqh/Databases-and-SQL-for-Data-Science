@@ -1,0 +1,348 @@
+Working with a real world data-set using SQL and Python
+==========================================================
+
+1. Connect to the database
+========================
+The syntax for connecting to magic sql using sqllite is
+
+%sql sqlite://DatabaseName   
+
+where DatabaseName will be your .db file.
+
+
+
+import csv, sqlite3
+
+con = sqlite3.connect("RealWorldData.db")
+cur = con.cursor()
+
+
+!pip install -q pandas==1.1.5
+
+%load_ext sql
+
+%sql ibm_db_sa://
+
+%sql sqlite:///RealWorldData.db
+
+2. Store the dataset in a Table
+==================================
+
+<!--
+
+import pandas
+df = pandas.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-DB0201EN-SkillsNetwork/labs/FinalModule_Coursera_V5/data/ChicagoCensusData.csv")
+df.to_sql("CENSUS_DATA", con, if_exists='replace', index=False,method="multi")
+
+df = pandas.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-DB0201EN-SkillsNetwork/labs/FinalModule_Coursera_V5/data/ChicagoCrimeData.csv")
+df.to_sql("CHICAGO_CRIME_DATA", con, if_exists='replace', index=False, method="multi")
+
+df = pandas.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-DB0201EN-SkillsNetwork/labs/FinalModule_Coursera_V5/data/ChicagoPublicSchools.csv")
+df.to_sql("CHICAGO_PUBLIC_SCHOOLS_DATA", con, if_exists='replace', index=False, method="multi")
+
+-->
+
+3. Query the database system catalog to retrieve table metadata
+===============================================================
+
+<!-- Solution using SQLite:
+
+%sql SELECT name FROM sqlite_master WHERE type='table'
+
+name
+CENSUS_DATA
+CHICAGO_CRIME_DATA
+CHICAGO_PUBLIC_SCHOOLS_DATA
+
+-->
+
+4. Query the database system catalog to retrieve column metadata
+==================================================================
+  ----The SCHOOLS table contains a large number of columns. How many columns does this table have?
+<!-- Solution SQLite:
+%sql SELECT count(name) FROM PRAGMA_TABLE_INFO('CHICAGO_PUBLIC_SCHOOLS_DATA');
+
+-->
+  ----Now retrieve the the list of columns in SCHOOLS table and their column type (datatype) and length.
+  <!-- Solution 
+
+%sql SELECT name,typeof(name),length(name) FROM PRAGMA_TABLE_INFO('CHICAGO_PUBLIC_SCHOOLS_DATA');
+
+-->
+
+Problem 1
+How many Elementary Schools are in the dataset?
+   
+   %sql select count(*) from CHICAGO_PUBLIC_SCHOOLS_DATA where "Elementary, Middle, or High School"='ES'
+   Correct answer: 462
+   
+Problem 2¶
+What is the highest Safety Score?  
+
+   %sql select MAX(Safety_Score) AS MAX_SAFETY_SCORE from CHICAGO_PUBLIC_SCHOOLS_DATA
+   
+   Correct answer: 99
+  
+Problem 3
+Which schools have highest Safety Score?
+
+<!-- Solution:
+In the previous problem we found out that the highest Safety Score is 99, so we can use that as an input in the where clause:
+
+%sql select Name_of_School, Safety_Score from CHICAGO_PUBLIC_SCHOOLS_DATA where Safety_Score = 99
+
+or, a better way:
+
+%sql select Name_of_School, Safety_Score from CHICAGO_PUBLIC_SCHOOLS_DATA where \
+  Safety_Score= (select MAX(Safety_Score) from CHICAGO_PUBLIC_SCHOOLS_DATA)
+
+
+Correct answer: several schools with with Safety Score of 99.
+-->
+
+Problem 4
+What are the top 10 schools with the highest "Average Student Attendance"?
+
+<!-- Solution:
+
+%sql select Name_of_School, Average_Student_Attendance from CHICAGO_PUBLIC_SCHOOLS_DATA \
+    order by Average_Student_Attendance desc nulls last limit 10 
+
+-->
+
+Problem 5
+Retrieve the list of 5 Schools with the lowest Average Student Attendance sorted in ascending order based on attendance
+
+<!-- Solution:
+
+%sql SELECT Name_of_School, Average_Student_Attendance  \
+     from CHICAGO_PUBLIC_SCHOOLS_DATA \
+     order by Average_Student_Attendance \
+     LIMIT 5
+
+-->
+Problem 6
+Now remove the '%' sign from the above result set for Average Student Attendance column
+
+<!-- Hint:
+
+%sql SELECT Name_of_School, REPLACE(Average_Student_Attendance, '%', '') \
+     from CHICAGO_PUBLIC_SCHOOLS_DATA \
+     order by Average_Student_Attendance \
+     LIMIT 5
+
+-->
+
+Problem 7
+Which Schools have Average Student Attendance lower than 70%
+
+<!-- Solution:
+
+%sql SELECT Name_of_School, Average_Student_Attendance  \
+     from CHICAGO_PUBLIC_SCHOOLS_DATA \
+     where CAST ( REPLACE(Average_Student_Attendance, '%', '') AS DOUBLE ) < 70 \
+     order by Average_Student_Attendance
+     
+
+-->
+
+Problem 8
+Get the total College Enrollment for each Community Area
+
+
+<!-- Solution:
+
+%sql select Community_Area_Name, sum(College_Enrollment) AS TOTAL_ENROLLMENT \
+   from CHICAGO_PUBLIC_SCHOOLS_DATA \
+   group by Community_Area_Name 
+
+-->
+
+Problem 9
+Get the 5 Community Areas with the least total College Enrollment sorted in ascending order
+
+<!-- Solution:
+
+%sql select Community_Area_Name, sum(College_Enrollment) AS TOTAL_ENROLLMENT \
+   from CHICAGO_PUBLIC_SCHOOLS_DATA \
+   group by Community_Area_Name \
+   order by TOTAL_ENROLLMENT asc \
+   LIMIT 5 
+
+-->
+
+Problem 10
+List 5 schools with lowest safety score.
+
+<!-- Solution SQLite:
+
+%sql SELECT name_of_school, safety_score \
+FROM CHICAGO_PUBLIC_SCHOOLS_DATA  where safety_score !='None' \
+ORDER BY safety_score \
+LIMIT 5
+
+-->
+
+Problem 11
+Get the hardship index for the community area which has College Enrollment of 4368
+
+<!-- Solution:
+NOTE: For this solution to work the CHICAGO_SOCIOECONOMIC_DATA table 
+      as created in the last lab of Week 3 should already exist
+
+%%sql 
+select hardship_index from CENSUS_DATA CD, CHICAGO_PUBLIC_SCHOOLS_DATA CPS 
+where CD.community_area_number = CPS.community_area_number 
+and college_enrollment = 4368
+
+
+-->
+
+Problem 12
+Get the hardship index for the community area which has the highest value for College Enrollment
+
+<!-- Solution:
+NOTE: For this solution to work the CHICAGO_SOCIOECONOMIC_DATA table 
+      as created in the last lab of Week 3 should already exist
+
+%sql select community_area_number, community_area_name, hardship_index from CENSUS_DATA \
+   where community_area_number in \
+   ( select community_area_number from CHICAGO_PUBLIC_SCHOOLS_DATA order by college_enrollment desc limit 1 )
+-->
+
+
+
+Services Credentitials.
+======================
+
+{
+  "connection": {
+    "cli": {
+      "arguments": [
+        [
+          "-u",
+          "bhc17839",
+          "-p",
+          "wQLVweQGVWqn1Jcl",
+          "--ssl",
+          "--sslCAFile",
+          "1dd14d0c-1b52-4f63-a606-53ecba28771d",
+          "--authenticationDatabase",
+          "admin",
+          "--host",
+          "764264db-9824-4b7c-82df-40d1b13897c2.bs2io90l08kqb1od8lcg.databases.appdomain.cloud:32536"
+        ]
+      ],
+      "bin": "db2",
+      "certificate": {
+        "certificate_base64": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURIVENDQWdXZ0F3SUJBZ0lVT3dvMC9va09CUEN5RjFWeFJxVGhKRW9ubDBVd0RRWUpLb1pJaHZjTkFRRUwKQlFBd0hqRWNNQm9HQTFVRUF3d1RTVUpOSUVOc2IzVmtJRVJoZEdGaVlYTmxjekFlRncweU1EQTRNRFF3TWpVMwpNalphRncwek1EQTRNREl3TWpVM01qWmFNQjR4SERBYUJnTlZCQU1NRTBsQ1RTQkRiRzkxWkNCRVlYUmhZbUZ6ClpYTXdnZ0VpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElCRHdBd2dnRUtBb0lCQVFEb0ZFNGQ0SGdOeXZMUVIwR3gKQTB0amRXQnM4NVBjTDNyRStjN1R3K2diRUdQSUxJU0VZV3o4Y1g1TG1XQk0rY1FnOG9VeSsrQXJ3OEoxaXdRZQpySmlIU2I1clF4WTM0c3BQeGRFVEZkWEhScnJhMGU2VmM4MW42TllJL0ZHSnl1Q3hrTG5GMUtFQW9hbHYwaDM2CnhDT0FvcXRwTlFrTzNpMTRGeU0yRDRiajkxckI4RGk4Vy9XMVpVdVhMNGwzZXVLZUVCeTRuZmhJV3kySVc3aUMKbGpMZ3RlN3hZTDVHbVpKOUdsYWtrSnJ1cnpNREFQLzVUYnRlUUIydElodTBRSVRFZHlESVFYUEZGRDBHYzloZAo3M29JdnpVZUJ3VC9uRHN3OTJNNC82SkdtZWpKN0lpdFBTN3Y2a2dlUVhINDlBaUVJNXpQdUVpVzNOYi9GR0pYCmY2a2JBZ01CQUFHalV6QlJNQjBHQTFVZERnUVdCQlR2RzZ2RU5MRjFVbWZnQ003MmxOcmMzSDI2bURBZkJnTlYKSFNNRUdEQVdnQlR2RzZ2RU5MRjFVbWZnQ003MmxOcmMzSDI2bURBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUEwRwpDU3FHU0liM0RRRUJDd1VBQTRJQkFRQTgvdFVnUTZlaTZYWHZndDJ0dUdrbkpva1Y5UWNkaTNZbFVFWkNDUytjClVQZ3NnMnVBMldxcHlWTm1mRkhjcHZ1Vmp0VHRYTmk2NUM2WlZsRnYxc3p1cU9zdFB5bkJ4blN4cUs0dkc0dTkKVjBWRUgxcE1tZnZBSmxkV3c4UEJTZGJtTk1HdGM4SzlwT0o5OVdBQ1ZFRXVXVGdDeHJKTXFBZnpYUXlidUV0dwp0cW1pV2swTmVXNGk5ZEY4S2dTWUVaQWFodXVBSlRldXB2R2RPV1U0eEV4bm03aEVRbmZPV2ZITThDd08xNWFZClRGQ2s0Q0pDUmR4Mlg5U284V3o1Z3MzcncyRkFDQlJyZ0NYeFFDZnZrZTZUdVNHNkxFRHJHbmpWaXVSQkpZdW4KT1RxWXROaVBHaHpuTHJrL0Fzam1LMzBxQmFLTmFyNUdQajhqalpNb2RiZ04KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=",
+        "name": "1dd14d0c-1b52-4f63-a606-53ecba28771d"
+      },
+      "composed": [
+        "db2 -u bhc17839 -p wQLVweQGVWqn1Jcl --ssl --sslCAFile 1dd14d0c-1b52-4f63-a606-53ecba28771d --authenticationDatabase admin --host 764264db-9824-4b7c-82df-40d1b13897c2.bs2io90l08kqb1od8lcg.databases.appdomain.cloud:32536"
+      ],
+      "environment": {},
+      "type": "cli"
+    },
+    "db2": {
+      "authentication": {
+        "method": "direct",
+        "password": "wQLVweQGVWqn1Jcl",
+        "username": "bhc17839"
+      },
+      "certificate": {
+        "certificate_base64": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURIVENDQWdXZ0F3SUJBZ0lVT3dvMC9va09CUEN5RjFWeFJxVGhKRW9ubDBVd0RRWUpLb1pJaHZjTkFRRUwKQlFBd0hqRWNNQm9HQTFVRUF3d1RTVUpOSUVOc2IzVmtJRVJoZEdGaVlYTmxjekFlRncweU1EQTRNRFF3TWpVMwpNalphRncwek1EQTRNREl3TWpVM01qWmFNQjR4SERBYUJnTlZCQU1NRTBsQ1RTQkRiRzkxWkNCRVlYUmhZbUZ6ClpYTXdnZ0VpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElCRHdBd2dnRUtBb0lCQVFEb0ZFNGQ0SGdOeXZMUVIwR3gKQTB0amRXQnM4NVBjTDNyRStjN1R3K2diRUdQSUxJU0VZV3o4Y1g1TG1XQk0rY1FnOG9VeSsrQXJ3OEoxaXdRZQpySmlIU2I1clF4WTM0c3BQeGRFVEZkWEhScnJhMGU2VmM4MW42TllJL0ZHSnl1Q3hrTG5GMUtFQW9hbHYwaDM2CnhDT0FvcXRwTlFrTzNpMTRGeU0yRDRiajkxckI4RGk4Vy9XMVpVdVhMNGwzZXVLZUVCeTRuZmhJV3kySVc3aUMKbGpMZ3RlN3hZTDVHbVpKOUdsYWtrSnJ1cnpNREFQLzVUYnRlUUIydElodTBRSVRFZHlESVFYUEZGRDBHYzloZAo3M29JdnpVZUJ3VC9uRHN3OTJNNC82SkdtZWpKN0lpdFBTN3Y2a2dlUVhINDlBaUVJNXpQdUVpVzNOYi9GR0pYCmY2a2JBZ01CQUFHalV6QlJNQjBHQTFVZERnUVdCQlR2RzZ2RU5MRjFVbWZnQ003MmxOcmMzSDI2bURBZkJnTlYKSFNNRUdEQVdnQlR2RzZ2RU5MRjFVbWZnQ003MmxOcmMzSDI2bURBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUEwRwpDU3FHU0liM0RRRUJDd1VBQTRJQkFRQTgvdFVnUTZlaTZYWHZndDJ0dUdrbkpva1Y5UWNkaTNZbFVFWkNDUytjClVQZ3NnMnVBMldxcHlWTm1mRkhjcHZ1Vmp0VHRYTmk2NUM2WlZsRnYxc3p1cU9zdFB5bkJ4blN4cUs0dkc0dTkKVjBWRUgxcE1tZnZBSmxkV3c4UEJTZGJtTk1HdGM4SzlwT0o5OVdBQ1ZFRXVXVGdDeHJKTXFBZnpYUXlidUV0dwp0cW1pV2swTmVXNGk5ZEY4S2dTWUVaQWFodXVBSlRldXB2R2RPV1U0eEV4bm03aEVRbmZPV2ZITThDd08xNWFZClRGQ2s0Q0pDUmR4Mlg5U284V3o1Z3MzcncyRkFDQlJyZ0NYeFFDZnZrZTZUdVNHNkxFRHJHbmpWaXVSQkpZdW4KT1RxWXROaVBHaHpuTHJrL0Fzam1LMzBxQmFLTmFyNUdQajhqalpNb2RiZ04KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=",
+        "name": "1dd14d0c-1b52-4f63-a606-53ecba28771d"
+      },
+      "composed": [
+        "db2://bhc17839:wQLVweQGVWqn1Jcl@764264db-9824-4b7c-82df-40d1b13897c2.bs2io90l08kqb1od8lcg.databases.appdomain.cloud:32536/bludb?authSource=admin&replicaSet=replset"
+      ],
+      "database": "bludb",
+      "host_ros": [
+        "764264db-9824-4b7c-82df-40d1b13897c2.bs2io90l08kqb1od8lcg.databases.appdomain.cloud:32761"
+      ],
+      "hosts": [
+        {
+          "hostname": "764264db-9824-4b7c-82df-40d1b13897c2.bs2io90l08kqb1od8lcg.databases.appdomain.cloud",
+          "port": 32536
+        }
+      ],
+      "jdbc_url": [
+        "jdbc:db2://764264db-9824-4b7c-82df-40d1b13897c2.bs2io90l08kqb1od8lcg.databases.appdomain.cloud:32536/bludb:user=<userid>;password=<your_password>;sslConnection=true;"
+      ],
+      "path": "/bludb",
+      "query_options": {
+        "authSource": "admin",
+        "replicaSet": "replset"
+      },
+      "replica_set": "replset",
+      "scheme": "db2",
+      "type": "uri"
+    }
+  },
+  "instance_administration_api": {
+    "deployment_id": "crn:v1:bluemix:public:dashdb-for-transactions:eu-gb:a/83b29ab45f424d1dbea88bd6d6bad848:37d0f121-f47b-4f3a-a623-c8c93a1a87f6::",
+    "instance_id": "crn:v1:bluemix:public:dashdb-for-transactions:eu-gb:a/83b29ab45f424d1dbea88bd6d6bad848:37d0f121-f47b-4f3a-a623-c8c93a1a87f6::",
+    "root": "https://apieugb.db2.cloud.ibm.com/v5/ibm"
+  }
+}
+
+Real Assignment 2
+===============
+
+
+CENSUS_DATA
+CHICAGO_CRIME_DATA
+CHICAGO_PUBLIC_SCHOOLS_DATA
+
+Problem 1
+Find the total number of crimes recorded in the CRIME table.
+%sql SELECT count(ID) FROM 'CHICAGO_CRIME_DATA';
+ * sqlite:///RealWorldData.db
+Done.
+count(ID)
+533
+
+Problem 2
+List community areas with per capita income less than 11000.
+
+%sql Select COMMUNITY_AREA_NUMBER, COMMUNITY_AREA_NAME, PER_CAPITA_INCOME  from CENSUS_DATA where PER_CAPITA_INCOME <11000; 
+
+Problem 3
+List all case numbers for crimes involving minors?(children are not considered minors for the purposes of crime analysis)
+
+Problem 4
+List all kidnapping crimes involving a child?
+
+%sql select COMMUNITY_AREA_NUMBER, PERCENT_AGED_16__UNEMPLOYED, PERCENT_AGED_UNDER_18_OR_OVER_64 from CENSUS_DATA;
+
+Problem 5
+What kinds of crimes were recorded at schools?
+
+%sql Select DISTINCT PRIMARY_TYPE as 'Kind of Crimes Recorded at Schools' from CHICAGO_CRIME_DATA  where LOCATION_DESCRIPTION like '%School%' 
+
+Problem 6
+List the average safety score for each type of school.
+
+%sql select  [Elementary, Middle, or High School], avg(safety_score) from CHICAGO_PUBLIC_SCHOOLS_DATA group by   [Elementary, Middle, or High School] ;
+
+Problem 7
+List 5 community areas with highest % of households below poverty line
+
+%sql select COMMUNITY_AREA_NUMBER,COMMUNITY_AREA_NAME,PERCENT_HOUSEHOLDS_BELOW_POVERTY from CENSUS_DATA order by PERCENT_HOUSEHOLDS_BELOW_POVERTY desc limit 5;
+
+Problem 8
+Which community area is most crime prone?
+
+%sql Select COMMUNITY_AREA_NAME  from CENSUS_DATA where COMMUNITY_AREA_NUMBER in (Select COMMUNITY_AREA_NUMBER from (select COMMUNITY_AREA_NUMBER , max(beat)  from  CHICAGO_CRIME_DATA ))
+
+
+Problem 9
+Use a sub-query to find the name of the community area with highest hardship index
+
+%sql Select COMMUNITY_AREA_NAME, HARDSHIP_INDEX from CENSUS_DATA  where HARDSHIP_INDEX= (select max(HARDSHIP_INDEX) from CENSUS_DATA );
+
+Problem 10¶
+Use a sub-query to determine the Community Area Name with most number of crimes?
+
+%sql Select a.COMMUNITY_AREA_NAME, b.COMMUNITY_AREA_NUMBER, b.max_value from (CENSUS_DATA)a, (select  COMMUNITY_AREA_NUMBER , max(beat) as max_value  from  CHICAGO_CRIME_DATA where COMMUNITY_AREA_NUMBER is not null) b where a.COMMUNITY_AREA_NUMBER=b.COMMUNITY_AREA_NUMBER ; 
